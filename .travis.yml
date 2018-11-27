@@ -8,6 +8,7 @@ before_install:
   - mv /tmp/terraform ~/bin
   - export PATH="~/bin:$PATH"
 script:
+- terraform init ./terraform
 - terraform plan ./terraform
 deploy:
 - provider: script
