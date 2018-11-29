@@ -1,5 +1,5 @@
 provider "google" {
-  credentials = "${file("account.json")}"
+  credentials = "${file("../service_account.json")}"
   project     = "kube-personal"
   region      = "europe-west2"
 }
