@@ -1,13 +1,12 @@
 #!/bin/bash
 
-# all nodes:
+# install required packages
 sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-
 sudo echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
-
 sudo apt-get update
 sudo apt-get install -y kubelet kubeadm kubectl kubernetes-cni docker
 sudo apt install -y docker.io awscli
+sudo snap install fluxctl
 sudo systemctl enable docker.service
 sudo systemctl start docker.service
 
@@ -38,4 +37,20 @@ cat <<EOF >> /home/ubuntu/custom_crontab
 0 */6 * * * ./generate_join.sh
 EOF
 crontab /home/ubuntu/custom_crontab
+
+# install flux and configure it to pull from kubeconfig repo
+kubectl create ns flux
+
+export GHUSER="gilmoregrills"
+fluxctl install \
+    --git-user=${GHUSER} \
+    --git-email=${GHUSER}@users.noreply.github.com \
+    --git-url=git@github.com:${GHUSER}/personal-cluster-flux-configs \
+    --git-path=namespaces,workloads \
+    --namespace=flux | kubectl apply -f -
+
+# send flux ssh key to secured s3 bucket
+# TODO: See if I could configure my github repo with this key using the API
+fluxctl identity --k8s-fwd-ns flux >> "/home/ubuntu/flux_ssh_key"
+aws s3 cp /home/ubuntu/flux_ssh_key s3://personal-cluster-scripts/flux_ssh_key
 
