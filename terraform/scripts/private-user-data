@@ -1,0 +1,22 @@
+#!/bin/bash
+
+sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
+sudo echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl kubernetes-cni docker
+sudo apt install -y docker.io awscli
+sudo systemctl enable docker.service
+sudo systemctl start docker.service
+
+aws s3 cp s3://personal-cluster-scripts/join_cluster.sh /tmp/join_cluster.sh
+
+sudo cat <<EOF > /etc/systemd/system/kubelet.service.d/20-labels-taints.conf
+[Service]
+Environment="KUBELET_EXTRA_ARGS=--node-labels=node-role.kubernetes.io/worker=,public=false"
+EOF
+
+chmod 755 /tmp/join_cluster.sh
+/tmp/join_cluster.sh
+

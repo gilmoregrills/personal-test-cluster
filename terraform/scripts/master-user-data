@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# all nodes:
+sudo curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
+sudo echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl kubernetes-cni docker
+sudo apt install -y docker.io awscli
+sudo systemctl enable docker.service
+sudo systemctl start docker.service
+
+# master stuff
+sudo kubeadm init --pod-network-cidr=192.168.0.0/16 # cidr for calico
+
+# copy kubeconfig somewhere that normies can get to it
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# install CNI (calico)
+kubectl apply -f https://docs.projectcalico.org/v3.8/manifests/calico.yaml
+
+# write a script that will write the the join-cluster command to a script and send it to s3
+cat <<EOF >> /home/ubuntu/generate_join.sh
+token=\$(sudo kubeadm token create) 
+ca_cert_hash=\$(sudo openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //')
+instance_ip=\$(sudo curl http://169.254.169.254/latest/meta-data/local-ipv4)
+echo "sudo kubeadm join \${instance_ip}:6443 --token \${token} --discovery-token-ca-cert-hash sha256:\${ca_cert_hash}" >> /home/ubuntu/join_cluster.sh
+aws s3 cp /home/ubuntu/join_cluster.sh s3://personal-cluster-scripts/join_cluster.sh
+EOF
+chmod 755 /home/ubuntu/generate_join.sh
+/home/ubuntu/generate_join.sh
+
+# write a custom crontab that will regenerate tbat join-cluster command every 6 hours (expires every 24)
+cat <<EOF >> /home/ubuntu/custom_crontab
+0 */6 * * * ./generate_join.sh
+EOF
+crontab /home/ubuntu/custom_crontab
+
