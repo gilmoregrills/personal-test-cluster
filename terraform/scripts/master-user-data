@@ -46,7 +46,7 @@ fluxctl install \
     --git-user=${GHUSER} \
     --git-email=${GHUSER}@users.noreply.github.com \
     --git-url=git@github.com:${GHUSER}/personal-cluster-flux-configs \
-    --git-path=namespaces,workloads \
+    --git-path=kubernetes \
     --namespace=flux | kubectl apply -f -
 
 # send flux ssh key to secured s3 bucket
